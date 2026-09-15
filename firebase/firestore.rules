@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// ════════════════════════════════════════════════════════════════════════
+// Mosdal Branding Solution — Firestore security rules
+// ════════════════════════════════════════════════════════════════════════
+// Paste this into Firebase Console → Firestore Database → Rules → Publish
+// (or deploy with `firebase deploy --only firestore:rules` if you use the
+// Firebase CLI).
+//
+// What this sets up, mirroring the old Supabase RLS policies:
+//   - anyone (site visitors) can submit a quote, an order, a testimonial,
+//     or a contact message, and can read the public portfolio + approved
+//     testimonials
+//   - only a signed-in admin (Firebase Auth) can read quotes/orders/
+//     messages, approve/reject testimonials, and add/edit/delete
+//     portfolio items
+// ════════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Portfolio: public can read everything; only a signed-in admin can write.
+    match /portfolio_items/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
+    // Testimonials: public can read only approved reviews, and can submit
+    // new ones (always unapproved). Only the admin can see pending ones,
+    // approve, or delete.
+    match /testimonials/{testimonialId} {
+      allow read: if resource.data.approved == true || request.auth != null;
+      allow create: if request.resource.data.approved == false;
+      allow update, delete: if request.auth != null;
+    }
+
+    // Quote requests: anyone can submit one; only the admin can read/update.
+    match /quote_requests/{quoteId} {
+      allow create: if request.resource.data.status == 'new';
+      allow read, update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Orders: anyone can submit one; only the admin can read/update.
+    match /orders/{orderId} {
+      allow create: if request.resource.data.status == 'pending';
+      allow read, update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Contact messages: anyone can submit one; only the admin can read,
+    // mark read/unread, or delete.
+    match /contact_messages/{messageId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+  }
+}

@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// ════════════════════════════════════════════════════════════════════════
+// Mosdal Branding Solution — Firebase Storage security rules
+// ════════════════════════════════════════════════════════════════════════
+// Paste this into Firebase Console → Storage → Rules → Publish.
+//
+// Portfolio images are public to read (they're shown on the public
+// Portfolio page) but only a signed-in admin can upload/replace/delete
+// them.
+// ════════════════════════════════════════════════════════════════════════
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /portfolio-images/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
