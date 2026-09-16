@@ -44,7 +44,13 @@ function toISO(value: unknown): string {
 
 /** Re-reads a doc right after a write so callers get server-resolved
  *  fields back (e.g. the real `createdAt` timestamp), the same way the
- *  old Supabase code used `.select().single()` after an insert/update. */
+ *  old Supabase code used `.select().single()` after an insert/update.
+ *
+ *  ⚠️ Only safe to call for collections whose read rule allows the
+ *  current caller to read the doc back. That's true for portfolio_items
+ *  (public read) but NOT for testimonials / quote_requests / orders /
+ *  contact_messages when written by an anonymous visitor — those four
+ *  build their return value locally instead. */
 async function getDocById<T>(
   collectionName: string,
   id: string,
@@ -244,7 +250,21 @@ export async function addTestimonial(t: NewTestimonial): Promise<Testimonial> {
     approved: false,
     createdAt: serverTimestamp(),
   });
-  return getDocById("testimonials", created.id, mapTestimonial);
+  // NOTE: We build the return value locally instead of re-reading the
+  // doc. The public read rule only allows reading testimonials where
+  // `approved == true`, so an anonymous visitor can't read back the
+  // unapproved doc they just created. The stored `createdAt` on the
+  // server is still the real server timestamp via serverTimestamp().
+  return {
+    id: created.id,
+    name: t.name,
+    company: t.company,
+    rating: t.rating,
+    message: t.message,
+    avatarUrl: t.avatarUrl ?? undefined,
+    approved: false,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 /** Admin-only: mark a pending testimonial as approved so it shows publicly. */
@@ -279,7 +299,20 @@ export async function addQuoteRequest(q: NewQuoteRequest): Promise<QuoteRequest>
     status: "new",
     createdAt: serverTimestamp(),
   });
-  return getDocById("quote_requests", created.id, mapQuote);
+  // Same reason as addTestimonial: the read rule requires auth, so we
+  // construct the return value locally rather than re-reading.
+  return {
+    id: created.id,
+    name: q.name,
+    email: q.email,
+    phone: q.phone,
+    service: q.service,
+    details: q.details,
+    budget: q.budget,
+    deadline: q.deadline,
+    status: "new",
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export async function updateQuoteStatus(
@@ -312,7 +345,21 @@ export async function addOrder(o: NewOrder): Promise<Order> {
     status: "pending",
     createdAt: serverTimestamp(),
   });
-  return getDocById("orders", created.id, mapOrder);
+  // Same reason as addTestimonial: the read rule requires auth, so we
+  // construct the return value locally rather than re-reading.
+  return {
+    id: created.id,
+    name: o.name,
+    email: o.email,
+    phone: o.phone,
+    service: o.service,
+    quantity: o.quantity,
+    specifications: o.specifications,
+    deliveryAddress: o.deliveryAddress,
+    total: "TBD — Subject to quotation",
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export async function updateOrderStatus(id: string, status: Order["status"]): Promise<void> {
@@ -338,7 +385,17 @@ export async function addContactMessage(m: NewContactMessage): Promise<ContactMe
     read: false,
     createdAt: serverTimestamp(),
   });
-  return getDocById("contact_messages", created.id, mapContactMessage);
+  // Same reason as addTestimonial: the read rule requires auth, so we
+  // construct the return value locally rather than re-reading.
+  return {
+    id: created.id,
+    name: m.name,
+    email: m.email,
+    subject: m.subject,
+    message: m.message,
+    read: false,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 /** Admin-only: toggle a message's read/unread state. */
